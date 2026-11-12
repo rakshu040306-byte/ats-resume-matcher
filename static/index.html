@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Resume & ATS Job Matcher</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .card {
+            background-color: #1e293b;
+            padding: 32px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            width: 100%;
+            max-width: 560px;
+        }
+        h2 { margin-top: 0; color: #38bdf8; text-align: center; }
+        .form-group { margin-bottom: 18px; }
+        label { display: block; margin-bottom: 6px; font-size: 14px; color: #cbd5e1; font-weight: 600; }
+        input[type="file"], textarea {
+            width: 100%; padding: 10px; border-radius: 6px;
+            border: 1px solid #334155; background-color: #0f172a;
+            color: #ffffff; font-size: 14px; box-sizing: border-box;
+        }
+        textarea { height: 120px; resize: vertical; font-family: inherit; }
+        button {
+            width: 100%; padding: 12px; background-color: #0284c7;
+            color: white; border: none; border-radius: 6px;
+            font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 6px;
+        }
+        button:hover { background-color: #0369a1; }
+        #results {
+            margin-top: 24px; background-color: #0f172a;
+            padding: 20px; border-radius: 8px; border: 1px solid #334155;
+            display: none;
+        }
+        .score-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 8px; }
+        .bar-bg { width: 100%; height: 22px; background-color: #1e293b; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+        .bar-fill { height: 100%; width: 0%; background-color: #10b981; transition: width 0.7s ease; }
+        .section-label { font-size: 13px; color: #94a3b8; margin-bottom: 8px; font-weight: bold; }
+        .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+        .tag-match { background-color: #065f46; color: #6ee7b7; padding: 4px 10px; border-radius: 999px; font-size: 12px; }
+        .tag-miss { background-color: #7f1d1d; color: #fca5a5; padding: 4px 10px; border-radius: 999px; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Smart Resume & ATS Matcher</h2>
+
+    <div class="form-group">
+        <label for="resumeFile">Upload Resume (PDF Only)</label>
+        <input type="file" id="resumeFile" accept=".pdf" required>
+    </div>
+
+    <div class="form-group">
+        <label for="jdText">Paste Target Job Description</label>
+        <textarea id="jdText" placeholder="Paste the required skills, role summary, and qualifications here..."></textarea>
+    </div>
+
+    <button onclick="analyzeResume()">Calculate ATS Match Score</button>
+
+    <div id="results">
+        <div class="score-header">
+            <span>ATS Alignment Score</span>
+            <span id="scoreText">0%</span>
+        </div>
+        <div class="bar-bg"><div class="bar-fill" id="scoreBar"></div></div>
+
+        <div class="section-label">Matched Keywords Found:</div>
+        <div class="tags" id="matchedTags"></div>
+
+        <div class="section-label">Missing High-Value Keywords:</div>
+        <div class="tags" id="missingTags"></div>
+    </div>
+</div>
+
+<script>
+    async function analyzeResume() {
+        const fileInput = document.getElementById("resumeFile");
+        const jdText = document.getElementById("jdText").value.trim();
+
+        if (!fileInput.files.length || !jdText) {
+            alert("Please upload a PDF resume and paste a job description.");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("resume", fileInput.files[0]);
+        formData.append("job_description", jdText);
+
+        const response = await fetch("/analyze", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+
+        document.getElementById("results").style.display = "block";
+        document.getElementById("scoreText").innerText = data.match_score + "%";
+
+        const bar = document.getElementById("scoreBar");
+        bar.style.backgroundColor = data.match_score >= 60 ? "#10b981" : (data.match_score >= 35 ? "#f59e0b" : "#ef4444");
+        setTimeout(() => { bar.style.width = data.match_score + "%"; }, 50);
+
+        document.getElementById("matchedTags").innerHTML = data.matched_keywords.length
+            ? data.matched_keywords.map(k => `<span class="tag-match">${k}</span>`).join("")
+            : '<span style="font-size:12px;color:#64748b;">No direct matches found</span>';
+
+        document.getElementById("missingTags").innerHTML = data.missing_keywords.length
+            ? data.missing_keywords.map(k => `<span class="tag-miss">${k}</span>`).join("")
+            : '<span style="font-size:12px;color:#6ee7b7;">All key terms matched!</span>';
+    }
+</script>
+
+</body>
+</html>
